@@ -6,13 +6,14 @@ from urllib.parse import urlparse
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 load_dotenv()
 APP_NAME = os.getenv('APP_NAME', 'Dusko AI Prospector')
 API_KEY = os.getenv('SGAI_API_KEY', '')
+APP_ACCESS_TOKEN = os.getenv('APP_ACCESS_TOKEN', '')
 API_BASE = os.getenv('SGAI_API_BASE', 'https://v2-api.scrapegraphai.com/api').rstrip('/')
 MAX_BATCH_URLS = max(1, min(int(os.getenv('MAX_BATCH_URLS', '5')), 10))
 app = FastAPI(title=APP_NAME, version='0.1.0', description='Prospecting from public business websites.')
@@ -31,6 +32,12 @@ class ProspectResult(BaseModel):
     source_url: str
     offer: str
     result: Any
+
+def require_access_token(x_app_token: str | None = Header(default=None)) -> None:
+    if not APP_ACCESS_TOKEN:
+        raise HTTPException(status_code=503, detail='App access token is not configured. Set APP_ACCESS_TOKEN in environment secrets.')
+    if x_app_token is None or x_app_token != APP_ACCESS_TOKEN:
+        raise HTTPException(status_code=401, detail='Missing or invalid X-App-Token header.')
 
 def validate_public_url(url: str) -> str:
     parsed = urlparse(url)
@@ -71,11 +78,11 @@ async def scrape_and_qualify(url: str, offer: str, target_country: str | None = 
 def health() -> dict[str, str]:
     return {'status': 'ok', 'app': APP_NAME, 'scrapegraph_key_configured': str(bool(API_KEY)).lower()}
 
-@app.post('/api/prospect', response_model=ProspectResult)
+@app.post('/api/prospect', response_model=ProspectResult, dependencies=[__import__('fastapi').Depends(require_access_token)])
 async def prospect(request: ProspectRequest) -> ProspectResult:
     return ProspectResult(source_url=request.url, offer=request.offer, result=await scrape_and_qualify(request.url, request.offer, request.target_country))
 
-@app.post('/api/batch')
+@app.post('/api/batch', dependencies=[__import__('fastapi').Depends(require_access_token)])
 async def batch(request: BatchRequest) -> dict[str, Any]:
     if len(request.urls) > MAX_BATCH_URLS:
         raise HTTPException(status_code=400, detail=f'Batch limited to {MAX_BATCH_URLS} URLs per request.')
@@ -87,7 +94,7 @@ async def batch(request: BatchRequest) -> dict[str, Any]:
             results.append({'source_url': url, 'error': exc.detail, 'status_code': exc.status_code})
     return {'count': len(results), 'results': results}
 
-@app.post('/api/export-csv')
+@app.post('/api/export-csv', dependencies=[__import__('fastapi').Depends(require_access_token)])
 async def export_csv(request: BatchRequest) -> StreamingResponse:
     if len(request.urls) > MAX_BATCH_URLS:
         raise HTTPException(status_code=400, detail=f'Batch limited to {MAX_BATCH_URLS} URLs per request.')
