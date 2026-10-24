@@ -28,9 +28,10 @@ uvicorn app:app --reload
 Open `http://127.0.0.1:8000/docs` to test the API.
 
 ## API
+- `GET /` — French web interface
 - `GET /health`
-- `POST /api/prospect` — extract and qualify one business website.
-- `POST /api/batch` — process a small list of website URLs.
+- `POST /api/prospect` — extract and qualify one business website (requires `X-App-Token` header).
+- `POST /api/batch` — process a small list of website URLs (requires `X-App-Token`).
 
 ## Important
 Never commit `.env` or API keys. ScrapeGraphAI usage may consume paid credits; check your plan before batch runs. Use the tool only on publicly accessible pages and respect applicable laws, site terms, robots rules, and privacy requirements. Results require human verification before outreach.
