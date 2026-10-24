@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Header
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
 load_dotenv()
@@ -73,6 +73,32 @@ async def scrape_and_qualify(url: str, offer: str, target_country: str | None = 
         return response.json()
     except ValueError:
         return {'raw_text': response.text}
+
+
+@app.get("/", response_class=HTMLResponse)
+def home() -> str:
+    return """<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dusko AI Prospector</title>
+<style>
+:root{font-family:system-ui,sans-serif;color:#172033;background:#f4f6fa}body{max-width:760px;margin:36px auto;padding:0 16px}
+main{background:white;border:1px solid #e2e7f0;border-radius:16px;padding:24px;box-shadow:0 8px 30px #1720330b}
+h1{margin-top:0}label{display:block;font-weight:600;margin:16px 0 6px}
+input,textarea{width:100%;box-sizing:border-box;padding:12px;border:1px solid #c8d0de;border-radius:8px;font:inherit}
+button{margin-top:18px;padding:12px 18px;border:0;border-radius:8px;background:#203d75;color:white;font-weight:700}
+small{color:#526078}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f6fa;padding:14px;border-radius:8px}
+</style></head><body><main><h1>Dusko AI Prospector</h1>
+<p>Analyse un site professionnel public et évalue son adéquation avec ton offre commerciale.</p>
+<label for="token">Jeton d'accès de l'application</label><input id="token" type="password" autocomplete="off" placeholder="APP_ACCESS_TOKEN">
+<label for="url">URL du site à analyser</label><input id="url" type="url" placeholder="https://exemple.fr" required>
+<label for="offer">Ton offre ou les critères du prospect</label><textarea id="offer" rows="4" placeholder="Ex. : Je propose des travaux de rénovation aux agences immobilières des Alpes-Maritimes." required></textarea>
+<label for="country">Pays ciblé (facultatif)</label><input id="country" placeholder="France">
+<button id="run">Analyser le site</button><p id="status" role="status"></p><pre id="result" hidden></pre>
+<small>Les analyses peuvent consommer des crédits ScrapeGraphAI. Vérifie les résultats avant toute prospection.</small>
+</main><script>
+const btn=document.getElementById('run'), status=document.getElementById('status'), out=document.getElementById('result');
+btn.addEventListener('click',async()=>{const token=document.getElementById('token').value.trim(),url=document.getElementById('url').value.trim(),offer=document.getElementById('offer').value.trim(),country=document.getElementById('country').value.trim();if(!token||!url||!offer){status.textContent='Renseigne le jeton, une URL et ton offre.';return;}btn.disabled=true;status.textContent='Analyse en cours…';out.hidden=true;try{const r=await fetch('/api/prospect',{method:'POST',headers:{'Content-Type':'application/json','X-App-Token':token},body:JSON.stringify({url,offer,target_country:country||null})});const data=await r.json();if(!r.ok)throw new Error(data.detail||('Erreur HTTP '+r.status));out.textContent=JSON.stringify(data,null,2);out.hidden=false;status.textContent='Analyse terminée.';}catch(e){status.textContent='Échec : '+e.message;}finally{btn.disabled=false;}});
+</script></body></html>"""
 
 @app.get('/health')
 def health() -> dict[str, str]:
