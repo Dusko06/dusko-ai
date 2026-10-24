@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 load_dotenv()
 APP_NAME = os.getenv('APP_NAME', 'Dusko AI Prospector')
 API_KEY = os.getenv('SGAI_API_KEY', '')
-API_BASE = os.getenv('SGAI_API_BASE', 'https://api.scrapegraphai.com/v1').rstrip('/')
+API_BASE = os.getenv('SGAI_API_BASE', 'https://v2-api.scrapegraphai.com/api').rstrip('/')
 MAX_BATCH_URLS = max(1, min(int(os.getenv('MAX_BATCH_URLS', '5')), 10))
 app = FastAPI(title=APP_NAME, version='0.1.0', description='Prospecting from public business websites.')
 
@@ -47,11 +47,11 @@ async def scrape_and_qualify(url: str, offer: str, target_country: str | None = 
     url = validate_public_url(url)
     prompt = ('Analyze this public business website for B2B prospecting. Return JSON fields: company_name, website, country_or_location, business_activity, products_or_services, public_business_email, public_business_phone, public_contact_page, evidence_snippets, fit_score_0_to_100, fit_reasons, uncertainty_or_missing_fields, recommended_next_action. Only use contact details explicitly published for business contact; do not infer personal data. Do not invent missing details. Include source URLs where available. ' + f'Offer/criteria: {offer}. Target country: {target_country or "not specified"}.')
     # Confirm endpoint and request schema against the current ScrapeGraphAI docs before production use.
-    endpoint = f'{API_BASE}/smartscraper'
+    endpoint = f'{API_BASE}/extract'
     headers = {'SGAI-APIKEY': API_KEY, 'Content-Type': 'application/json'}
     try:
         async with httpx.AsyncClient(timeout=90, follow_redirects=False) as client:
-            response = await client.post(endpoint, json={'website_url': url, 'user_prompt': prompt, 'render_heavy_js': False}, headers=headers)
+            response = await client.post(endpoint, json={'url': url, 'prompt': prompt}, headers=headers)
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail='ScrapeGraphAI request timed out.')
     except httpx.RequestError as exc:
